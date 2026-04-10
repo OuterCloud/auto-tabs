@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auto Tab Groups — 规则管理</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="page-header">
+        <div class="header-left">
+          <img src="icons/icon48.png" width="28" height="28" alt="" />
+          <div>
+            <h1>Auto Tab Groups</h1>
+            <p class="subtitle">自定义规则，自动整理标签页</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost" id="btn-import">导入 JSON</button>
+          <button class="btn btn-ghost" id="btn-export">导出 JSON</button>
+          <input
+            type="file"
+            id="file-input"
+            accept=".json"
+            style="display: none"
+          />
+        </div>
+      </header>
+
+      <main>
+        <!-- Global settings -->
+        <div class="settings-card">
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">自动域名分组</span>
+              <span class="settings-desc"
+                >未命中规则的标签页按主域名自动分组，颜色由域名哈希决定</span
+              >
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="toggle-auto-domain" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">显示标签数量</span>
+              <span class="settings-desc"
+                >当分组内有多个标签时，在组名后显示数量，如 "GitHub (3)"</span
+              >
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="toggle-show-tab-count" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-label">
+              <span class="settings-title">标签标题增强</span>
+              <span class="settings-desc"
+                >在标签标题后追加 URL 路径，方便区分同站点的不同页面，如 "GitHub
+                - /user/repo"</span
+              >
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="toggle-enhance-title" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <span class="rules-count" id="rules-count">0 条规则</span>
+          <button class="btn btn-primary" id="btn-add">+ 添加规则</button>
+        </div>
+
+        <!-- Add/Edit form (hidden by default) -->
+        <div class="rule-form-card" id="rule-form" style="display: none">
+          <h3 id="form-title">添加规则</h3>
+          <div class="form-grid">
+            <label>
+              <span>规则名称</span>
+              <input
+                type="text"
+                id="f-name"
+                placeholder="例：GitLab"
+                maxlength="30"
+              />
+            </label>
+            <label>
+              <span>优先级 (-100~100)</span>
+              <input
+                type="number"
+                id="f-priority"
+                min="-100"
+                max="100"
+                value="0"
+                step="1"
+              />
+            </label>
+            <label>
+              <span>标签组颜色</span>
+              <div class="color-picker" id="color-picker">
+                <button
+                  class="color-btn"
+                  data-color="grey"
+                  style="background: #9e9e9e"
+                  title="Grey"
+                ></button>
+                <button
+                  class="color-btn"
+                  data-color="blue"
+                  style="background: #1a73e8"
+                  title="Blue"
+                ></button>
+                <button
+                  class="color-btn"
+                  data-color="red"
+                  style="background: #d93025"
+                  title="Red"
+                ></button>
+                <button
+                  class="color-btn"
+                  data-color="yellow"
+                  style="background: #f9ab00"
+                  title="Yellow"
+                ></button>
+                <button
+                  class="color-btn"
+                  data-color="green"
+                  style="background: #1e8e3e"
+                  title="Green"
+                ></button>
+                <button
+                  class="color-btn"
+                  data-color="pink"
+                  style="background: #e52592"
+                  title="Pink"
+                ></button>
+                <button
+                  class="color-btn"
+                  data-color="purple"
+                  style="background: #9334e6"
+                  title="Purple"
+                ></button>
+                <button
+                  class="color-btn"
+                  data-color="cyan"
+                  style="background: #129eaf"
+                  title="Cyan"
+                ></button>
+                <button
+                  class="color-btn"
+                  data-color="orange"
+                  style="background: #fa7b17"
+                  title="Orange"
+                ></button>
+              </div>
+              <input type="hidden" id="f-color" value="blue" />
+            </label>
+            <label>
+              <span>匹配类型</span>
+              <select id="f-type">
+                <option value="prefix">URL 前缀</option>
+                <option value="contains">URL 包含</option>
+                <option value="regex">正则表达式</option>
+              </select>
+            </label>
+            <label class="full-width">
+              <span>匹配模式</span>
+              <input
+                type="text"
+                id="f-pattern"
+                placeholder="例：https://github.com/"
+              />
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-ghost" id="btn-cancel">取消</button>
+            <button class="btn btn-primary" id="btn-save">保存规则</button>
+          </div>
+        </div>
+
+        <!-- Rules table -->
+        <div class="rules-table-wrap">
+          <table class="rules-table" id="rules-table">
+            <thead>
+              <tr>
+                <th class="col-drag"></th>
+                <th class="col-color">颜色</th>
+                <th class="col-priority">优先级</th>
+                <th class="col-name">名称</th>
+                <th class="col-type">类型</th>
+                <th class="col-pattern">匹配模式</th>
+                <th class="col-enabled">启用</th>
+                <th class="col-actions">操作</th>
+              </tr>
+            </thead>
+            <tbody id="rules-tbody">
+              <!-- Rows injected by JS -->
+            </tbody>
+          </table>
+          <div class="empty-state" id="empty-state" style="display: none">
+            <p>暂无规则，点击"添加规则"开始配置</p>
+          </div>
+        </div>
+      </main>
+
+      <div class="toast" id="toast"></div>
+    </div>
+    <script src="utils/rules.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

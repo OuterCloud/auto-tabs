@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (if build tools added later)
+node_modules/
+npm-debug.log*
+
+# Chrome extension build output
+dist/
+*.crx
+*.pem
+
+# Claude
+.claude/
+
+# Local rules (may contain internal/private URLs)
+rules.local.json
