@@ -231,6 +231,16 @@ async function reorderGroups(windowId, rules) {
         console.warn("[AutoTabGroups] reorderGroups move error:", err.message);
       }
     }
+
+    // After reorder, pin the active tab's group to top if autoFocus is enabled
+    if (settings.autoFocus) {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId });
+      if (activeTab && activeTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+        try {
+          await chrome.tabGroups.move(activeTab.groupId, { index: 0 });
+        } catch { /* group may have been removed */ }
+      }
+    }
   } catch (err) {
     console.warn("[AutoTabGroups] reorderGroups error:", err.message);
   }

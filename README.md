@@ -1,5 +1,7 @@
 # Auto Tab Groups
 
+[English](./README.en.md) | 中文
+
 Chrome 扩展（Manifest V3），根据自定义 URL 规则自动将标签页归入分组。
 
 ## 功能特性
