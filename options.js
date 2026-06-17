@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     settings.showTabCount;
   document.getElementById("toggle-enhance-title").checked =
     settings.enhanceTitle;
+  document.getElementById("toggle-auto-focus").checked = settings.autoFocus;
   renderTable();
   bindEvents();
 });
@@ -359,6 +360,17 @@ function bindEvents() {
         e.target.checked
           ? "标签标题增强已开启，新加载的页面将生效"
           : "标签标题增强已关闭",
+      );
+    });
+
+  // Auto-focus toggle
+  document
+    .getElementById("toggle-auto-focus")
+    .addEventListener("change", async (e) => {
+      settings.autoFocus = e.target.checked;
+      await saveSettings(settings);
+      showToast(
+        e.target.checked ? "自动定位当前分组已开启" : "自动定位当前分组已关闭",
       );
     });
 }

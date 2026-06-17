@@ -269,6 +269,39 @@ async function organizeAllTabs() {
   }
 }
 
+// ─── Auto-focus: move active tab's group to top ──────────────────────────────
+
+let _focusTimer = null;
+const FOCUS_DEBOUNCE_MS = 150;
+
+/**
+ * When a tab is activated, move its group to the top of the tab strip.
+ * This ensures the active tab is always visible at the top of the vertical sidebar.
+ * @param {number} tabId
+ * @param {number} windowId
+ */
+async function focusActiveTabGroup(tabId, windowId) {
+  try {
+    const settings = await loadSettings();
+    if (!settings.autoFocus) return;
+
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return;
+
+    // Move the active tab's group to index 0 (top)
+    await chrome.tabGroups.move(tab.groupId, { index: 0 });
+  } catch (err) {
+    console.warn("[AutoTabGroups] focusActiveTabGroup error:", err.message);
+  }
+}
+
+chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
+  clearTimeout(_focusTimer);
+  _focusTimer = setTimeout(() => {
+    focusActiveTabGroup(tabId, windowId);
+  }, FOCUS_DEBOUNCE_MS);
+});
+
 // ─── Tab event listeners ───────────────────────────────────────────────────────
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
@@ -277,6 +310,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   const rules = await loadRules();
   await organizeTab(tabId, tab.url, tab.windowId, rules);
   await maybeEnhanceTitle(tabId, tab.url);
+  // If this tab is active, move its group to top (handles new tab case)
+  if (tab.active) {
+    focusActiveTabGroup(tabId, tab.windowId);
+  }
 });
 
 // Clean up tracking when tab is closed

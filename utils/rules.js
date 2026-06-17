@@ -177,6 +177,7 @@ async function loadSettings() {
     autoDomain: true,
     showTabCount: true,
     enhanceTitle: true,
+    autoFocus: true,
     ...settings,
   };
 }
