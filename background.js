@@ -335,13 +335,11 @@ async function focusActiveTabGroup(tabId, windowId) {
     if (!_groupMRU[windowId]) _groupMRU[windowId] = [];
     const mru = _groupMRU[windowId];
     const idx = mru.indexOf(baseName);
+    if (idx === 0) return; // already at front, no reorder needed
     if (idx > 0) {
       mru.splice(idx, 1);
-      mru.unshift(baseName);
-    } else if (idx === -1) {
-      mru.unshift(baseName);
     }
-    // idx === 0 means already at front, no change needed
+    mru.unshift(baseName);
 
     // Reorder all groups by MRU
     const rules = await loadRules();
