@@ -10,6 +10,10 @@ const REORDER_DEBOUNCE_MS = 300;
 const _titleTimers = {};
 const TITLE_DEBOUNCE_MS = 200;
 
+// MRU (Most Recently Used) tracking per window: windowId → [groupName, ...]
+// Index 0 = most recently used
+const _groupMRU = {};
+
 // ─── Core: organize a single tab ──────────────────────────────────────────────
 
 /**
@@ -184,9 +188,10 @@ async function organizeTab(tabId, url, windowId, rules) {
 // ─── Reorder tab groups by priority ────────────────────────────────────────
 
 /**
- * Reorder tab groups in a window by priority (DESC) then title (ASC).
- * Only moves groups that match a rule or an auto-domain group.
- * Unmanaged groups (manually created, from other extensions) are left in place.
+ * Reorder tab groups in a window.
+ * When autoFocus is enabled, uses MRU (Most Recently Used) ordering —
+ * groups are sorted by last access time (most recent at top).
+ * When autoFocus is disabled, sorts by priority (DESC) then title (ASC).
  * @param {number} windowId
  * @param {Array} rules
  */
@@ -195,7 +200,7 @@ async function reorderGroups(windowId, rules) {
     const groups = await chrome.tabGroups.query({ windowId });
     const settings = await loadSettings();
 
-    // Build a list of { groupId, priority, title } for managed groups only
+    // Build a list of { groupId, priority, title, baseName } for managed groups only
     const managed = [];
     for (const group of groups) {
       const baseName = group.title.replace(/\s*\(\d+\)$/, "");
@@ -205,21 +210,38 @@ async function reorderGroups(windowId, rules) {
           groupId: group.id,
           priority: rule.priority ?? 0,
           title: group.title,
+          baseName,
         });
       } else if (settings.autoDomain && group.title) {
         // Auto-domain groups: treated as priority 0
-        managed.push({ groupId: group.id, priority: 0, title: group.title });
+        managed.push({ groupId: group.id, priority: 0, title: group.title, baseName });
       }
       // else: unmanaged group, skip
     }
 
     if (managed.length < 2) return; // nothing to reorder
 
-    // Sort: higher priority first, then alphabetically by title
-    managed.sort((a, b) => {
-      if (b.priority !== a.priority) return b.priority - a.priority;
-      return a.title.localeCompare(b.title);
-    });
+    if (settings.autoFocus) {
+      // MRU ordering: sort by last-used time (most recent first)
+      const mru = _groupMRU[windowId] || [];
+      managed.sort((a, b) => {
+        const aIdx = mru.indexOf(a.baseName);
+        const bIdx = mru.indexOf(b.baseName);
+        // Groups in MRU list come first, ordered by recency (lower index = more recent)
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        // Groups not in MRU: fall back to priority then alpha
+        if (b.priority !== a.priority) return b.priority - a.priority;
+        return a.title.localeCompare(b.title);
+      });
+    } else {
+      // Classic ordering: higher priority first, then alphabetically by title
+      managed.sort((a, b) => {
+        if (b.priority !== a.priority) return b.priority - a.priority;
+        return a.title.localeCompare(b.title);
+      });
+    }
 
     // Move groups in order. Moving to index -1 appends to the end,
     // so we iterate in order and each group stacks after the previous.
@@ -229,16 +251,6 @@ async function reorderGroups(windowId, rules) {
       } catch (err) {
         // Group may have been removed mid-reorder; skip and continue
         console.warn("[AutoTabGroups] reorderGroups move error:", err.message);
-      }
-    }
-
-    // After reorder, pin the active tab's group to top if autoFocus is enabled
-    if (settings.autoFocus) {
-      const [activeTab] = await chrome.tabs.query({ active: true, windowId });
-      if (activeTab && activeTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-        try {
-          await chrome.tabGroups.move(activeTab.groupId, { index: 0 });
-        } catch { /* group may have been removed */ }
       }
     }
   } catch (err) {
@@ -273,6 +285,20 @@ async function organizeAllTabs() {
         await maybeEnhanceTitle(tab.id, tab.url);
       }
     }
+
+    // Seed MRU with active tab's group so it stays on top after reorder
+    const [activeTab] = await chrome.tabs.query({ active: true, windowId: win.id });
+    if (activeTab && activeTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
+      const groups = await chrome.tabGroups.query({ windowId: win.id });
+      const activeGroup = groups.find((g) => g.id === activeTab.groupId);
+      if (activeGroup) {
+        const baseName = activeGroup.title.replace(/\s*\(\d+\)$/, "");
+        if (!_groupMRU[win.id]) _groupMRU[win.id] = [];
+        const mru = _groupMRU[win.id];
+        if (!mru.includes(baseName)) mru.unshift(baseName);
+      }
+    }
+
     // Reorder groups immediately after organizing all tabs in this window
     await reorderGroups(win.id, rules);
     await updateGroupTitles(win.id, rules);
@@ -285,8 +311,8 @@ let _focusTimer = null;
 const FOCUS_DEBOUNCE_MS = 150;
 
 /**
- * When a tab is activated, move its group to the top of the tab strip.
- * This ensures the active tab is always visible at the top of the vertical sidebar.
+ * When a tab is activated, record its group in the MRU list and reorder
+ * all groups by most recently used order.
  * @param {number} tabId
  * @param {number} windowId
  */
@@ -298,8 +324,28 @@ async function focusActiveTabGroup(tabId, windowId) {
     const tab = await chrome.tabs.get(tabId);
     if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return;
 
-    // Move the active tab's group to index 0 (top)
-    await chrome.tabGroups.move(tab.groupId, { index: 0 });
+    // Get the group's base name to track in MRU
+    const groups = await chrome.tabGroups.query({ windowId });
+    const group = groups.find((g) => g.id === tab.groupId);
+    if (!group) return;
+
+    const baseName = group.title.replace(/\s*\(\d+\)$/, "");
+
+    // Update MRU list: move this group to the front
+    if (!_groupMRU[windowId]) _groupMRU[windowId] = [];
+    const mru = _groupMRU[windowId];
+    const idx = mru.indexOf(baseName);
+    if (idx > 0) {
+      mru.splice(idx, 1);
+      mru.unshift(baseName);
+    } else if (idx === -1) {
+      mru.unshift(baseName);
+    }
+    // idx === 0 means already at front, no change needed
+
+    // Reorder all groups by MRU
+    const rules = await loadRules();
+    await reorderGroups(windowId, rules);
   } catch (err) {
     console.warn("[AutoTabGroups] focusActiveTabGroup error:", err.message);
   }

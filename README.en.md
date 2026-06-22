@@ -18,7 +18,7 @@ A Chrome extension (Manifest V3) that automatically groups tabs based on custom 
 - **Auto Domain Grouping**: Tabs not matching any rule are grouped by root domain with a hash-based color; can be toggled off
 - **Tab Count Display**: Shows tab count in group titles when a group has multiple tabs, e.g. "GitHub (3)"
 - **Title Enhancement**: Appends URL path info to tab titles to distinguish same-site pages
-- **Auto-focus Active Group**: Moves the active tab's group to the top when switching tabs, making it easy to locate in vertical tab bars
+- **MRU Group Sorting**: Tab groups are sorted by most recently used — the group you just visited stays at the top, followed by previously used groups in recency order, so you never have to search blindly
 
 ## Installation
 
@@ -56,7 +56,7 @@ Right-click the extension icon → "Options", or click "Manage Rules" in the pop
 | Auto Domain Group   | Toggle at the top of the page to control auto-grouping by domain                    |
 | Show Tab Count      | Display tab count in group titles                                                   |
 | Title Enhancement   | Append URL path to tab titles for same-site differentiation                         |
-| Auto-focus Group    | Move active tab's group to the top on tab switch, ideal for vertical tab bars       |
+| MRU Group Sorting   | Sort groups by most recently used, latest at top                                    |
 
 ### Rule Matching Types
 
