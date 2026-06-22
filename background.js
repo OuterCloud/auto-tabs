@@ -11,8 +11,24 @@ const _titleTimers = {};
 const TITLE_DEBOUNCE_MS = 200;
 
 // MRU (Most Recently Used) tracking per window: windowId → [groupName, ...]
-// Index 0 = most recently used
-const _groupMRU = {};
+// Index 0 = most recently used.
+// Persisted to chrome.storage.session to survive Service Worker restarts.
+let _groupMRU = {};
+
+/**
+ * Load MRU from session storage (survives SW restarts, cleared on browser close).
+ */
+const _mruReady = (async () => {
+  const { groupMRU } = await chrome.storage.session.get("groupMRU");
+  _groupMRU = groupMRU || {};
+})();
+
+/**
+ * Persist current MRU to session storage.
+ */
+function saveMRU() {
+  chrome.storage.session.set({ groupMRU: _groupMRU });
+}
 
 // ─── Core: organize a single tab ──────────────────────────────────────────────
 
@@ -197,6 +213,7 @@ async function organizeTab(tabId, url, windowId, rules) {
  */
 async function reorderGroups(windowId, rules) {
   try {
+    await _mruReady;
     const groups = await chrome.tabGroups.query({ windowId });
     const settings = await loadSettings();
 
@@ -295,7 +312,10 @@ async function organizeAllTabs() {
         const baseName = activeGroup.title.replace(/\s*\(\d+\)$/, "");
         if (!_groupMRU[win.id]) _groupMRU[win.id] = [];
         const mru = _groupMRU[win.id];
-        if (!mru.includes(baseName)) mru.unshift(baseName);
+        if (!mru.includes(baseName)) {
+          mru.unshift(baseName);
+          saveMRU();
+        }
       }
     }
 
@@ -318,6 +338,7 @@ const FOCUS_DEBOUNCE_MS = 150;
  */
 async function focusActiveTabGroup(tabId, windowId) {
   try {
+    await _mruReady;
     const settings = await loadSettings();
     if (!settings.autoFocus) return;
 
@@ -340,6 +361,7 @@ async function focusActiveTabGroup(tabId, windowId) {
       mru.splice(idx, 1);
     }
     mru.unshift(baseName);
+    saveMRU();
 
     // Reorder all groups by MRU
     const rules = await loadRules();
