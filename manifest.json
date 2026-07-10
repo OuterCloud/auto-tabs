@@ -3,7 +3,7 @@
   "name": "Auto Tab Groups",
   "version": "1.0.0",
   "description": "根据自定义规则自动将标签页分组",
-  "permissions": ["tabs", "tabGroups", "storage", "scripting"],
+  "permissions": ["tabs", "tabGroups", "storage", "scripting", "contextMenus"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"

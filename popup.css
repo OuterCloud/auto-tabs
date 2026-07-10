@@ -67,6 +67,56 @@ header {
   color: #666;
 }
 
+.rename-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rename-row {
+  display: flex;
+  gap: 6px;
+}
+
+.rename-row input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.rename-row input:focus {
+  border-color: #0066cc;
+}
+
+.btn-rename {
+  padding: 6px 10px;
+  background: #f5f5f7;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.btn-rename:hover {
+  background: #e8e8ea;
+}
+
+.rename-hint {
+  font-size: 11px;
+  color: #4caf50;
+  min-height: 14px;
+}
+
+.rename-hint.error {
+  color: #e53935;
+}
+
 .btn-primary {
   display: flex;
   align-items: center;

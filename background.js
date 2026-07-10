@@ -422,6 +422,91 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 });
 
+// ─── Context menu: rename tab ─────────────────────────────────────────────────
+
+// Register context menu (runs on every SW start; create is idempotent with same id)
+chrome.contextMenus.removeAll().then(() => {
+  chrome.contextMenus.create({
+    id: "rename-tab",
+    title: "重命名标签",
+    contexts: ["page"],
+  });
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== "rename-tab" || !tab?.id) return;
+
+  // Inject a prompt to get custom name from user
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (currentTitle) => {
+        return window.prompt("输入自定义标签名称：", currentTitle);
+      },
+      args: [tab.title || ""],
+    });
+
+    const newName = result?.result;
+    if (!newName) return; // user cancelled or empty
+
+    // Store custom name and apply it
+    const key = `tabName_${tab.id}`;
+    await chrome.storage.session.set({ [key]: newName });
+
+    // Override the document title
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (name) => {
+        document.title = name;
+        // Prevent other scripts from overwriting
+        const titleEl = document.querySelector("title");
+        if (titleEl) {
+          new MutationObserver((_, obs) => {
+            if (document.title !== name) {
+              document.title = name;
+            }
+          }).observe(titleEl, { childList: true, characterData: true, subtree: true });
+        }
+      },
+      args: [newName],
+    });
+  } catch (err) {
+    console.warn("[AutoTabGroups] rename tab error:", err.message);
+  }
+});
+
+// Restore custom names when tabs reload
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  if (changeInfo.status !== "complete") return;
+  const key = `tabName_${tabId}`;
+  const data = await chrome.storage.session.get(key);
+  const customName = data[key];
+  if (!customName) return;
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (name) => {
+        document.title = name;
+        const titleEl = document.querySelector("title");
+        if (titleEl) {
+          new MutationObserver(() => {
+            if (document.title !== name) {
+              document.title = name;
+            }
+          }).observe(titleEl, { childList: true, characterData: true, subtree: true });
+        }
+      },
+      args: [customName],
+    });
+  } catch { /* tab may not be injectable */ }
+});
+
+// Clean up custom names when tabs are closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.session.remove(`tabName_${tabId}`);
+});
+
 // ─── Stats helper (for popup) ─────────────────────────────────────────────────
 
 async function getStats() {

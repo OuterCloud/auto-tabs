@@ -19,6 +19,7 @@ A Chrome extension (Manifest V3) that automatically groups tabs based on custom 
 - **Tab Count Display**: Shows tab count in group titles when a group has multiple tabs, e.g. "GitHub (3)"
 - **Title Enhancement**: Appends URL path info to tab titles to distinguish same-site pages
 - **MRU Group Sorting**: Tab groups are sorted by most recently used — the group you just visited stays at the top, followed by previously used groups in recency order, so you never have to search blindly
+- **Tab Renaming**: Set custom names for tabs via right-click context menu or extension popup, useful for distinguishing identical-title tabs (e.g. multiple terminal sessions)
 
 ## Installation
 
@@ -57,6 +58,7 @@ Right-click the extension icon → "Options", or click "Manage Rules" in the pop
 | Show Tab Count      | Display tab count in group titles                                                   |
 | Title Enhancement   | Append URL path to tab titles for same-site differentiation                         |
 | MRU Group Sorting   | Sort groups by most recently used, latest at top                                    |
+| Rename Tab          | Set a custom name for the current tab via popup or right-click menu                 |
 
 ### Rule Matching Types
 
@@ -126,4 +128,5 @@ auto-tabs/
 | `tabs`      | Read tab URLs, listen to load events             |
 | `tabGroups` | Create, query, and update tab groups             |
 | `storage`   | Persist rules via `chrome.storage.sync`          |
-| `scripting` | Dynamically inject content script for title enhancement |
+| `scripting`     | Dynamically inject content script for title enhancement |
+| `contextMenus`  | Right-click "Rename Tab" context menu item              |
