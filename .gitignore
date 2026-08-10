@@ -23,3 +23,5 @@ dist/
 
 # Local rules (may contain internal/private URLs)
 rules.local.json
+# tokensave local state (SQLite db + machine-local config)
+.tokensave/

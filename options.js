@@ -28,7 +28,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     settings.showTabCount;
   document.getElementById("toggle-enhance-title").checked =
     settings.enhanceTitle;
-  document.getElementById("toggle-auto-focus").checked = settings.autoFocus;
+
+  // Set sort mode radio
+  const sortMode = settings.sortMode || "mru";
+  const radio = document.querySelector(`input[name="sort-mode"][value="${sortMode}"]`);
+  if (radio) radio.checked = true;
+
   renderTable();
   bindEvents();
 });
@@ -363,14 +368,13 @@ function bindEvents() {
       );
     });
 
-  // Auto-focus toggle
-  document
-    .getElementById("toggle-auto-focus")
-    .addEventListener("change", async (e) => {
-      settings.autoFocus = e.target.checked;
+  // Sort mode radio
+  document.querySelectorAll('input[name="sort-mode"]').forEach((radio) => {
+    radio.addEventListener("change", async (e) => {
+      settings.sortMode = e.target.value;
       await saveSettings(settings);
-      showToast(
-        e.target.checked ? "自动定位当前分组已开启" : "自动定位当前分组已关闭",
-      );
+      const labels = { mru: "按最近使用排序", priority: "按自定义权重排序", none: "不自动排序" };
+      showToast(`已切换为：${labels[e.target.value]}`);
     });
+  });
 }

@@ -169,22 +169,33 @@ function domainToColor(domain) {
 
 /**
  * Load global settings from storage.
- * @returns {Promise<{autoDomain: boolean, showTabCount: boolean, enhanceTitle: boolean}>}
+ * Migrates legacy autoFocus boolean to sortMode enum.
+ * @returns {Promise<{autoDomain: boolean, showTabCount: boolean, enhanceTitle: boolean, sortMode: string}>}
  */
 async function loadSettings() {
   const { settings } = await chrome.storage.sync.get("settings");
-  return {
+  const defaults = {
     autoDomain: true,
     showTabCount: true,
     enhanceTitle: true,
-    autoFocus: true,
-    ...settings,
+    sortMode: "mru", // "mru" | "priority" | "none"
   };
+  const raw = settings || {};
+  const merged = { ...defaults, ...raw };
+
+  // Migrate legacy autoFocus boolean → sortMode (only if user has old setting but no new one)
+  if ("autoFocus" in raw && !("sortMode" in raw)) {
+    merged.sortMode = raw.autoFocus ? "mru" : "priority";
+  }
+
+  // Remove legacy field from result
+  delete merged.autoFocus;
+  return merged;
 }
 
 /**
  * Persist global settings to storage.
- * @param {{autoDomain: boolean}} settings
+ * @param {{autoDomain: boolean, showTabCount: boolean, enhanceTitle: boolean, sortMode: string}} settings
  */
 async function saveSettings(settings) {
   await chrome.storage.sync.set({ settings });

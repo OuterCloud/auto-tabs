@@ -204,18 +204,22 @@ async function organizeTab(tabId, url, windowId, rules) {
 // ─── Reorder tab groups by priority ────────────────────────────────────────
 
 /**
- * Reorder tab groups in a window.
- * When autoFocus is enabled, uses MRU (Most Recently Used) ordering —
- * groups are sorted by last access time (most recent at top).
- * When autoFocus is disabled, sorts by priority (DESC) then title (ASC).
+ * Reorder tab groups in a window based on sortMode setting.
+ * - "mru": MRU (Most Recently Used) ordering — most recent at top.
+ * - "priority": sort by rule priority (DESC) then title (ASC).
+ * - "none": no automatic reordering.
  * @param {number} windowId
  * @param {Array} rules
  */
 async function reorderGroups(windowId, rules) {
   try {
     await _mruReady;
-    const groups = await chrome.tabGroups.query({ windowId });
     const settings = await loadSettings();
+
+    // If sort mode is "none", skip reordering entirely
+    if (settings.sortMode === "none") return;
+
+    const groups = await chrome.tabGroups.query({ windowId });
 
     // Build a list of { groupId, priority, title, baseName } for managed groups only
     const managed = [];
@@ -238,7 +242,7 @@ async function reorderGroups(windowId, rules) {
 
     if (managed.length < 2) return; // nothing to reorder
 
-    if (settings.autoFocus) {
+    if (settings.sortMode === "mru") {
       // MRU ordering: sort by last-used time (most recent first)
       const mru = _groupMRU[windowId] || [];
       managed.sort((a, b) => {
@@ -253,7 +257,7 @@ async function reorderGroups(windowId, rules) {
         return a.title.localeCompare(b.title);
       });
     } else {
-      // Classic ordering: higher priority first, then alphabetically by title
+      // Priority ordering: higher priority first, then alphabetically by title
       managed.sort((a, b) => {
         if (b.priority !== a.priority) return b.priority - a.priority;
         return a.title.localeCompare(b.title);
@@ -332,7 +336,7 @@ const FOCUS_DEBOUNCE_MS = 150;
 
 /**
  * When a tab is activated, record its group in the MRU list and reorder
- * all groups by most recently used order.
+ * all groups by most recently used order (only when sortMode is "mru").
  * @param {number} tabId
  * @param {number} windowId
  */
@@ -340,7 +344,7 @@ async function focusActiveTabGroup(tabId, windowId) {
   try {
     await _mruReady;
     const settings = await loadSettings();
-    if (!settings.autoFocus) return;
+    if (settings.sortMode !== "mru") return;
 
     const tab = await chrome.tabs.get(tabId);
     if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return;

@@ -70,15 +70,25 @@
           </div>
           <div class="settings-row">
             <div class="settings-label">
-              <span class="settings-title">按最近使用排序</span>
+              <span class="settings-title">标签组排序方式</span>
               <span class="settings-desc"
-                >标签组按最近使用时间排列，最近访问的在最上方，从上往下依次由近到远</span
+                >选择标签组在标签栏中的排列方式</span
               >
             </div>
-            <label class="toggle">
-              <input type="checkbox" id="toggle-auto-focus" />
-              <span class="toggle-slider"></span>
-            </label>
+            <div class="sort-mode-radios">
+              <label class="radio-label">
+                <input type="radio" name="sort-mode" value="mru" />
+                <span>按最近使用</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="sort-mode" value="priority" />
+                <span>按自定义权重</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="sort-mode" value="none" />
+                <span>不自动排序</span>
+              </label>
+            </div>
           </div>
         </div>
 

@@ -92,6 +92,12 @@ h1 {
   gap: 16px;
 }
 
+.settings-row + .settings-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
 .settings-label {
   display: flex;
   flex-direction: column;
@@ -106,6 +112,29 @@ h1 {
 .settings-desc {
   font-size: 12px;
   color: #888;
+}
+
+/* Sort mode radio group */
+.sort-mode-radios {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #444;
+}
+
+.radio-label input[type="radio"] {
+  accent-color: #0066cc;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
 }
 
 /* ── Toolbar ─────────────────────────────────── */
