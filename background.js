@@ -101,15 +101,12 @@ function scheduleUpdateTitles(windowId, rules) {
   }, TITLE_DEBOUNCE_MS);
 }
 
-// Track tabs that already have the title enhancement injected
+// Track tabs that already have the title enhancement activated
 const _enhancedTabs = new Set();
 
-// Track tabs currently being renamed (to avoid re-injection race)
-const _renamingTabs = new Set();
-
 /**
- * Inject content.js into a tab to enhance its title with URL path info.
- * Only injects if enhanceTitle setting is enabled and tab hasn't been injected yet.
+ * Send a message to the tab's content script to enable title enhancement.
+ * Content script is declaratively injected, no executeScript needed.
  * @param {number} tabId
  * @param {string} url
  */
@@ -126,14 +123,10 @@ async function maybeEnhanceTitle(tabId, url) {
     const settings = await loadSettings();
     if (!settings.enhanceTitle) return;
 
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ["content.js"],
-    });
+    await chrome.tabs.sendMessage(tabId, { action: "enableEnhanceTitle" });
     _enhancedTabs.add(tabId);
-  } catch (err) {
-    // Tab may not be injectable (e.g. chrome web store)
-    console.warn("[AutoTabGroups] enhanceTitle inject error:", err.message);
+  } catch {
+    // Content script not yet loaded — will be activated on next onUpdated
   }
 }
 
@@ -390,8 +383,6 @@ chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   // Only act when the tab finishes loading (has a final URL)
   if (changeInfo.status !== "complete") return;
-  // Skip if tab is currently being renamed (avoid concurrent injection)
-  if (_renamingTabs.has(tabId)) return;
   const rules = await loadRules();
   await organizeTab(tabId, tab.url, tab.windowId, rules);
   await maybeEnhanceTitle(tabId, tab.url);
@@ -440,8 +431,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 /**
  * Rename a tab by sending a message to the content script.
- * Uses declarative content script (content-rename.js) instead of executeScript
- * to avoid Chrome IO thread crashes.
+ * Uses declarative content script (content-rename.js) — no executeScript.
  * @param {number} tabId
  * @param {string} name
  */
@@ -459,23 +449,7 @@ async function renameTab(tabId, name) {
   await chrome.storage.session.set({ [key]: name });
 
   // Send message to the declarative content script
-  try {
-    await chrome.tabs.sendMessage(tabId, { action: "applyRename", name });
-  } catch {
-    // Content script may not be loaded yet (e.g. page just opened), fall back to executeScript
-    _renamingTabs.add(tabId);
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        files: ["content-rename.js"],
-      });
-      // Wait a moment for script to initialize, then send message
-      await new Promise((r) => setTimeout(r, 100));
-      await chrome.tabs.sendMessage(tabId, { action: "applyRename", name });
-    } finally {
-      setTimeout(() => _renamingTabs.delete(tabId), 500);
-    }
-  }
+  await chrome.tabs.sendMessage(tabId, { action: "applyRename", name });
 }
 
 // ─── Context menu: rename tab ─────────────────────────────────────────────────
@@ -499,17 +473,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  // Inject a prompt to get custom name from user
+  // Ask content script to prompt user for new name
   try {
-    const [result] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: (currentTitle) => {
-        return window.prompt("输入自定义标签名称：", currentTitle);
-      },
-      args: [tab.title || ""],
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      action: "promptRename",
+      currentTitle: tab.title || "",
     });
 
-    const newName = result?.result;
+    const newName = response?.name;
     if (!newName) return; // user cancelled or empty
 
     await renameTab(tab.id, newName);
@@ -521,8 +492,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // Restore custom names when tabs reload (send message to content script)
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
-  // Skip if tab is currently being renamed
-  if (_renamingTabs.has(tabId)) return;
   const key = `tabName_${tabId}`;
   const data = await chrome.storage.session.get(key);
   const customName = data[key];
@@ -538,12 +507,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   try {
     await chrome.tabs.sendMessage(tabId, { action: "applyRename", name: customName });
   } catch {
-    // Content script not yet loaded; inject and retry
-    try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ["content-rename.js"] });
-      await new Promise((r) => setTimeout(r, 100));
-      await chrome.tabs.sendMessage(tabId, { action: "applyRename", name: customName });
-    } catch { /* tab may not be injectable */ }
+    // Content script not ready yet; will apply on next load
   }
 });
 

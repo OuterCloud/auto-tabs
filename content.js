@@ -1,12 +1,9 @@
 // content.js — Enhance tab title with URL path for better identification
-// Injected programmatically by background.js when enhanceTitle is enabled.
+// Injected declaratively via manifest. Activates only when signaled by background.
 
 (function () {
+  let active = false;
   let updating = false;
-
-  // If content-rename.js has set a custom name, don't enhance
-  // We use a page-level flag to coordinate
-  if (window.__autoTabGroupsRenamed) return;
 
   function getPathSuffix() {
     return location.pathname === "/" ? "" : location.pathname;
@@ -20,6 +17,7 @@
     if (updating) return;
     // Don't override custom rename
     if (window.__autoTabGroupsRenamed) return;
+    if (!active) return;
 
     const suffix = getPathSuffix();
     if (!suffix) return;
@@ -33,25 +31,28 @@
     }
   }
 
-  // Initial enhancement
-  enhance();
-
-  // Watch for SPA title changes (framework updates document.title)
-  const titleEl = document.querySelector("title");
-  if (titleEl) {
-    new MutationObserver(() => enhance()).observe(titleEl, {
-      childList: true,
-      characterData: true,
-      subtree: true,
-    });
-  }
-
-  // Watch for SPA navigation (URL path changes without page reload)
-  let lastPath = location.pathname;
-  setInterval(() => {
-    if (location.pathname !== lastPath) {
-      lastPath = location.pathname;
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.action === "enableEnhanceTitle") {
+      active = true;
       enhance();
+      // Watch for SPA title changes
+      const titleEl = document.querySelector("title");
+      if (titleEl) {
+        new MutationObserver(() => enhance()).observe(titleEl, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      }
+      // Watch for SPA navigation
+      let lastPath = location.pathname;
+      setInterval(() => {
+        if (location.pathname !== lastPath) {
+          lastPath = location.pathname;
+          enhance();
+        }
+      }, 1000);
+      sendResponse({ ok: true });
     }
-  }, 1000);
+  });
 })();
