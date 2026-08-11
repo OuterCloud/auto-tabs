@@ -4,6 +4,10 @@
 (function () {
   let updating = false;
 
+  // If content-rename.js has set a custom name, don't enhance
+  // We use a page-level flag to coordinate
+  if (window.__autoTabGroupsRenamed) return;
+
   function getPathSuffix() {
     return location.pathname === "/" ? "" : location.pathname;
   }
@@ -14,6 +18,9 @@
 
   function enhance() {
     if (updating) return;
+    // Don't override custom rename
+    if (window.__autoTabGroupsRenamed) return;
+
     const suffix = getPathSuffix();
     if (!suffix) return;
 
