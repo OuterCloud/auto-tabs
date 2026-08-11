@@ -106,7 +106,8 @@ const _enhancedTabs = new Set();
 
 /**
  * Send a message to the tab's content script to enable title enhancement.
- * Content script is declaratively injected, no executeScript needed.
+ * Content script is declaratively injected, no inline executeScript needed.
+ * Falls back to file injection for tabs opened before extension reload.
  * @param {number} tabId
  * @param {string} url
  */
@@ -123,10 +124,16 @@ async function maybeEnhanceTitle(tabId, url) {
     const settings = await loadSettings();
     if (!settings.enhanceTitle) return;
 
-    await chrome.tabs.sendMessage(tabId, { action: "enableEnhanceTitle" });
+    try {
+      await chrome.tabs.sendMessage(tabId, { action: "enableEnhanceTitle" });
+    } catch {
+      // Content script not loaded yet — inject file and retry
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+      await chrome.tabs.sendMessage(tabId, { action: "enableEnhanceTitle" });
+    }
     _enhancedTabs.add(tabId);
   } catch {
-    // Content script not yet loaded — will be activated on next onUpdated
+    // Tab may not be injectable
   }
 }
 
@@ -431,7 +438,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 /**
  * Rename a tab by sending a message to the content script.
- * Uses declarative content script (content-rename.js) — no executeScript.
+ * Uses declarative content script (content-rename.js) — no inline executeScript.
+ * Falls back to injecting the file if content script isn't loaded yet.
  * @param {number} tabId
  * @param {string} name
  */
@@ -449,7 +457,13 @@ async function renameTab(tabId, name) {
   await chrome.storage.session.set({ [key]: name });
 
   // Send message to the declarative content script
-  await chrome.tabs.sendMessage(tabId, { action: "applyRename", name });
+  try {
+    await chrome.tabs.sendMessage(tabId, { action: "applyRename", name });
+  } catch {
+    // Content script not loaded (tab opened before extension reload) — inject file and retry
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content-rename.js"] });
+    await chrome.tabs.sendMessage(tabId, { action: "applyRename", name });
+  }
 }
 
 // ─── Context menu: rename tab ─────────────────────────────────────────────────
@@ -475,10 +489,20 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   // Ask content script to prompt user for new name
   try {
-    const response = await chrome.tabs.sendMessage(tab.id, {
-      action: "promptRename",
-      currentTitle: tab.title || "",
-    });
+    let response;
+    try {
+      response = await chrome.tabs.sendMessage(tab.id, {
+        action: "promptRename",
+        currentTitle: tab.title || "",
+      });
+    } catch {
+      // Content script not loaded — inject and retry
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["content-rename.js"] });
+      response = await chrome.tabs.sendMessage(tab.id, {
+        action: "promptRename",
+        currentTitle: tab.title || "",
+      });
+    }
 
     const newName = response?.name;
     if (!newName) return; // user cancelled or empty
@@ -507,7 +531,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   try {
     await chrome.tabs.sendMessage(tabId, { action: "applyRename", name: customName });
   } catch {
-    // Content script not ready yet; will apply on next load
+    // Content script not loaded — inject and retry
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ["content-rename.js"] });
+      await chrome.tabs.sendMessage(tabId, { action: "applyRename", name: customName });
+    } catch { /* tab may not be injectable */ }
   }
 });
 
