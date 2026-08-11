@@ -424,7 +424,48 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     getStats().then((stats) => sendResponse(stats));
     return true;
   }
+
+  if (message.action === "renameTab") {
+    renameTab(message.tabId, message.name)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
 });
+
+/**
+ * Rename a tab by injecting a title override script.
+ * Runs in background SW so popup close won't interrupt the operation.
+ * @param {number} tabId
+ * @param {string} name
+ */
+async function renameTab(tabId, name) {
+  const tab = await chrome.tabs.get(tabId);
+
+  // Check if the tab URL is injectable
+  if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://") ||
+      tab.url.startsWith("https://chrome.google.com/webstore") ||
+      tab.url.startsWith("chrome-untrusted://") || tab.url.startsWith("about:")) {
+    throw new Error("该页面不支持重命名");
+  }
+
+  const key = `tabName_${tabId}`;
+  await chrome.storage.session.set({ [key]: name });
+
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (n) => {
+      document.title = n;
+      const titleEl = document.querySelector("title");
+      if (titleEl) {
+        new MutationObserver(() => {
+          if (document.title !== n) document.title = n;
+        }).observe(titleEl, { childList: true, characterData: true, subtree: true });
+      }
+    },
+    args: [name],
+  });
+}
 
 // ─── Context menu: rename tab ─────────────────────────────────────────────────
 

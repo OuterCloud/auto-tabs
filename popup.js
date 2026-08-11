@@ -39,39 +39,17 @@ async function doRename() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) return;
 
-  // Check if the tab URL is injectable
-  if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') ||
-      tab.url.startsWith('https://chrome.google.com/webstore') ||
-      tab.url.startsWith('chrome-untrusted://') || tab.url.startsWith('about:')) {
-    renameHint.className = 'rename-hint error';
-    renameHint.textContent = '该页面不支持重命名';
-    return;
-  }
-
-  const key = `tabName_${tab.id}`;
-  await chrome.storage.session.set({ [key]: newName });
-
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: (name) => {
-        document.title = name;
-        const titleEl = document.querySelector('title');
-        if (titleEl) {
-          new MutationObserver(() => {
-            if (document.title !== name) document.title = name;
-          }).observe(titleEl, { childList: true, characterData: true, subtree: true });
-        }
-      },
-      args: [newName],
-    });
-    renameHint.className = 'rename-hint';
-    renameHint.textContent = '已重命名';
-    setTimeout(() => { renameHint.textContent = ''; }, 2000);
-  } catch (err) {
-    renameHint.className = 'rename-hint error';
-    renameHint.textContent = '重命名失败';
-  }
+  // Delegate rename to background service worker to avoid popup-close race condition
+  chrome.runtime.sendMessage({ action: 'renameTab', tabId: tab.id, name: newName }, (res) => {
+    if (res?.ok) {
+      renameHint.className = 'rename-hint';
+      renameHint.textContent = '已重命名';
+      setTimeout(() => { renameHint.textContent = ''; }, 2000);
+    } else {
+      renameHint.className = 'rename-hint error';
+      renameHint.textContent = res?.error || '重命名失败';
+    }
+  });
 }
 
 // Organize all
