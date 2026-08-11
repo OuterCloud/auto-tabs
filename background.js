@@ -440,6 +440,13 @@ chrome.contextMenus.removeAll().then(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== "rename-tab" || !tab?.id) return;
 
+  // Skip non-injectable pages
+  if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://") ||
+      tab.url.startsWith("https://chrome.google.com/webstore") ||
+      tab.url.startsWith("chrome-untrusted://") || tab.url.startsWith("about:")) {
+    return;
+  }
+
   // Inject a prompt to get custom name from user
   try {
     const [result] = await chrome.scripting.executeScript({
@@ -480,12 +487,19 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // Restore custom names when tabs reload
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
   const key = `tabName_${tabId}`;
   const data = await chrome.storage.session.get(key);
   const customName = data[key];
   if (!customName) return;
+
+  // Skip non-injectable pages
+  if (!tab.url || tab.url.startsWith("chrome://") || tab.url.startsWith("chrome-extension://") ||
+      tab.url.startsWith("https://chrome.google.com/webstore") ||
+      tab.url.startsWith("chrome-untrusted://") || tab.url.startsWith("about:")) {
+    return;
+  }
 
   try {
     await chrome.scripting.executeScript({

@@ -39,6 +39,15 @@ async function doRename() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab) return;
 
+  // Check if the tab URL is injectable
+  if (!tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') ||
+      tab.url.startsWith('https://chrome.google.com/webstore') ||
+      tab.url.startsWith('chrome-untrusted://') || tab.url.startsWith('about:')) {
+    renameHint.className = 'rename-hint error';
+    renameHint.textContent = '该页面不支持重命名';
+    return;
+  }
+
   const key = `tabName_${tab.id}`;
   await chrome.storage.session.set({ [key]: newName });
 
