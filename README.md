@@ -106,6 +106,14 @@ Chrome 扩展（Manifest V3），根据自定义 URL 规则自动将标签页归
 
 该文件已被 `.gitignore` 忽略，不会提交到仓库。扩展首次加载时会优先读取此文件作为默认规则，找不到则使用内置示例。
 
+## 开发设置
+
+Clone 后执行以下命令启用 Git Hooks（自动递增版本号）：
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## 文件结构
 
 ```
