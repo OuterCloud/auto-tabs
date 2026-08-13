@@ -8,6 +8,11 @@ const renameInput = document.getElementById('rename-input');
 const btnRename   = document.getElementById('btn-rename');
 const renameHint  = document.getElementById('rename-hint');
 
+// Display version from manifest
+const versionEl = document.getElementById('version');
+const manifest = chrome.runtime.getManifest();
+versionEl.textContent = 'v' + manifest.version;
+
 // Load stats on open
 chrome.runtime.sendMessage({ action: 'getStats' }, (stats) => {
   if (!stats) return;

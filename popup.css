@@ -22,6 +22,7 @@ body {
 header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
 .logo {
@@ -38,6 +39,12 @@ header {
   font-weight: 600;
   font-size: 14px;
   color: #1a1a1a;
+}
+
+.version {
+  font-size: 11px;
+  color: #999;
+  font-weight: 400;
 }
 
 .stats {
